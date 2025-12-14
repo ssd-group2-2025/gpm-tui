@@ -1,5 +1,4 @@
-from gpm_ssd.manager import TUIManager
+from gpm_ssd.app import App
 
 if __name__ == '__main__':
-    manager = TUIManager()
-    manager.login("admin", "superuser")
+    App().run()
