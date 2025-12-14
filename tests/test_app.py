@@ -459,6 +459,7 @@ def test_remove_group(mocked_input, mocked_print):
 @patch('builtins.print')
 @patch('builtins.input', side_effect=['5', '1', '1', '1', '0', '0'])
 def test_add_group_goal(mocked_input, mocked_print):
+
     app = App()
     mock_session = MagicMock()
     mock_session.post.return_value.status_code = 201
@@ -482,6 +483,7 @@ def test_add_group_goal(mocked_input, mocked_print):
 @patch('builtins.print')
 @patch('builtins.input', side_effect=['5', '1', 'invalid', '1', '1', '0', '0'])
 def test_add_group_goal_resists_to_wrong_input(mocked_input, mocked_print):
+
     app = App()
     mock_session = MagicMock()
     mock_session.post.return_value.status_code = 201
@@ -504,6 +506,7 @@ def test_add_group_goal_resists_to_wrong_input(mocked_input, mocked_print):
 @patch('builtins.print')
 @patch('builtins.input', side_effect=['5', '2', '1', '0', '0'])
 def test_remove_group_goal(mocked_input, mocked_print):
+
     app = App()
     mock_session = MagicMock()
     mock_session.delete.return_value.status_code = 204
@@ -525,6 +528,7 @@ def test_remove_group_goal(mocked_input, mocked_print):
 @patch('builtins.print')
 @patch('builtins.input', side_effect=['5', '3', '1', '0', '0'])
 def test_toggle_group_goal(mocked_input, mocked_print):
+
     app = App()
     mock_session = MagicMock()
     mock_session.patch.return_value.status_code = 200
@@ -552,9 +556,10 @@ def test_toggle_group_goal(mocked_input, mocked_print):
 @patch('builtins.print')
 @patch('builtins.input', side_effect=['5', '1', '1', '1', '0', '0'])
 def test_add_duplicate_group_goal(mocked_input, mocked_print):
+
     app = App()
     mock_session = MagicMock()
-    mock_session.post.return_value.status_code = 201
+    mock_session.post.return_value.status_code = 400
     mock_session.post.return_value.json.return_value = {
         'non_field_errors': ['The fields group, goal must make a unique set.']
     }
@@ -565,6 +570,66 @@ def test_add_duplicate_group_goal(mocked_input, mocked_print):
     
     app.run()
 
+    mocked_input.assert_called()
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['5', '2', '1', '0', '0'])
+def test_remove_group_goal_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.delete.return_value.status_code = 404
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    from gpm_ssd.domain import GroupGoal
+    app._App__gpm.add_group_goal(GroupGoal(group_id=1, goal_id=1, complete=False, id=1))
+    app._App__data_loader.index_to_id_group_goals[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error removing group goal: 404')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['5', '3', '1', '0', '0'])
+def test_toggle_group_goal_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.patch.return_value.status_code = 404
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    from gpm_ssd.domain import GroupGoal
+    app._App__gpm.add_group_goal(GroupGoal(group_id=1, goal_id=1, complete=False, id=1))
+    app._App__data_loader.index_to_id_group_goals[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error toggling group goal: 404')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['5', '0'])
+def test_print_group_goals(mocked_input, mocked_print):
+
+    app = App()
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    
+    from gpm_ssd.domain import GroupGoal
+    app._App__gpm.add_group(GroupProject(GroupName("Group 1"), topic_id=1, id=1))
+    app._App__gpm.add_goal(Goal(GoalTitle("Goal 1"), GoalDescription("Desc"), Points.create(5), id=1))
+    app._App__gpm.add_group_goal(GroupGoal(group_id=1, goal_id=1, complete=True, id=1))
+    
+    app.run()
+    
     mocked_input.assert_called()
 
 
@@ -584,6 +649,105 @@ def test_sort_groups_by_name(mocked_print, mocked_input, sample_groups):
 
     mocked_input.assert_called()
     mocked_print.assert_any_call('Groups sorted by name!')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['2', '2', '1', '0', '0'])
+def test_join_group_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 404
+    mock_session.post.return_value.text = "Group not found"
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.session = mock_session
+    
+    app._App__gpm.add_group(GroupProject(GroupName("Test Group"), topic_id=1, id=1))
+    app._App__data_loader.index_to_id_groups[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error joining group: Group not found')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['2', '3', '1', '0', '0'])
+def test_leave_group_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.delete.return_value.status_code = 404
+    mock_session.delete.return_value.text = "Not a member"
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.session = mock_session
+    
+    app._App__gpm.add_group(GroupProject(GroupName("Test Group"), topic_id=1, id=1))
+    app._App__data_loader.index_to_id_groups[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error leaving group: Not a member')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['2', '4', '1', '0', '0'])
+def test_remove_group_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.delete.return_value.status_code = 404
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app._App__gpm.add_group(GroupProject(GroupName("Test Group"), topic_id=1, id=1))
+    app._App__data_loader.index_to_id_groups[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error removing group')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['3', '2', '1', '0', '0'])
+def test_remove_goal_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.delete.return_value.status_code = 404
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app._App__gpm.add_goal(Goal(GoalTitle("Goal 1"), GoalDescription("Desc"), Points.create(5), id=1))
+    app._App__data_loader.index_to_id_goals[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error removing goal')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['4', '2', '1', '0', '0'])
+def test_remove_topic_http_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.delete.return_value.status_code = 404
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    app._App__gpm.add_topic(Topic(TopicTitle("Topic 1"), id=1))
+    app._App__data_loader.index_to_id_topics[0] = 1
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error removing topic')
 
 
 # ==================== TEST LOAD DATA ====================
@@ -672,3 +836,246 @@ def test_manage_group_goals_requires_login(mocked_print, mocked_input):
     app.run()
     
     mocked_print.assert_any_call('You must login first')
+
+
+# ==================== TEST ERROR HANDLING ====================
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['2', '1', 'Test Group', '1', '', '', '', '0', '0'])
+def test_add_group_non_field_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {
+        'non_field_errors': ['Duplicate group name']
+    }
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Duplicate group name')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['2', '1', 'Test', '1', '', '', '', '0', '0'])
+def test_add_group_unknown_error(mocked_input, mocked_print):
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {}
+    mock_session.post.return_value.text = "Server error"
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Unknown error:', 'Server error')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['5', '1', '1', '1', '0', '0'])
+def test_add_group_goal_non_field_error(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {
+        'non_field_errors': ['Duplicate assignment']
+    }
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Duplicate assignment')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['5', '1', '1', '1', '0', '0'])
+def test_add_group_goal_unknown_error(mocked_input, mocked_print):
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {}
+    mock_session.post.return_value.text = "Server error"
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Unknown error:', 'Server error')
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['3', '1', 'Test Goal', 'Description', '5', '0', '0'])
+def test_add_goal_error_response(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {'title': ['Invalid title']}
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error creating goal:', {'title': ['Invalid title']})
+
+
+@patch('builtins.print')
+@patch('builtins.input', side_effect=['4', '1', 'Test Topic', '0', '0'])
+def test_add_topic_error_response(mocked_input, mocked_print):
+
+    app = App()
+    mock_session = MagicMock()
+    mock_session.post.return_value.status_code = 400
+    mock_session.post.return_value.json.return_value = {'title': ['Invalid title']}
+    
+    app._App__auth.token = MagicMock()
+    app._App__auth.token.is_staff.return_value = True
+    app._App__auth.session = mock_session
+    
+    app.run()
+
+    mocked_print.assert_any_call('Error creating topic:', {'title': ['Invalid title']})
+
+
+@patch('gpm_ssd.managers.auth_handler.getpass', return_value='test_password')
+@patch('requests.Session')
+@patch('builtins.input', side_effect=['1', 'test_user'])
+def test_load_data_with_warnings(mocked_input, mocked_session_class, mocked_pass):
+    mock_session = MagicMock()
+    mocked_session_class.return_value = mock_session
+    
+    mock_session.post.return_value.status_code = 200
+    mock_session.post.return_value.json.return_value = {
+        'access': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM0MTg3MjAwfQ.fake',
+        'refresh': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczNDE4NzIwMH0.fake'
+    }
+    
+    def get_side_effect(url, **kwargs):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        
+        if 'auth/user' in url:
+            mock_resp.json.return_value = {'pk': 1}
+        elif 'goals' in url:
+            mock_resp.json.return_value = [
+                {'id': 1, 'title': 'Valid Goal', 'description': 'Desc', 'points': 5},
+                {'id': 2, 'title': 'Invalid\nGoal', 'description': 'Desc', 'points': 3}
+            ]
+        elif 'topics' in url:
+            mock_resp.json.return_value = [
+                {'id': 1, 'title': 'Valid Topic'},
+                {'id': 2, 'title': 'Invalid\nTopic'}
+            ]
+        elif 'groups/' in url and 'group-' not in url:
+            mock_resp.json.return_value = [
+                {'id': 1, 'name': 'Valid', 'topic': 1, 'link_django': '', 'link_tui': '', 'link_gui': ''},
+                {'id': 2, 'name': 'Invalid\nName', 'topic': 1, 'link_django': '', 'link_tui': '', 'link_gui': ''}
+            ]
+        elif 'group-goals' in url:
+            mock_resp.json.return_value = [
+                {'id': 1, 'group': 1, 'goal': 1, 'complete': False},
+                {'id': 2, 'group': -1, 'goal': 1, 'complete': False}
+            ]
+        else:
+            mock_resp.json.return_value = []
+        
+        return mock_resp
+    
+    mock_session.get.side_effect = get_side_effect
+
+    app = App()
+    app.run()
+
+    assert app._App__gpm.number_of_goals >= 1
+    assert app._App__gpm.number_of_topics >= 1
+    assert app._App__gpm.number_of_groups >= 1
+
+
+@patch('builtins.input', side_effect=['6', '0'])
+@patch('builtins.print')
+def test_logout_not_logged_in(mocked_print, mocked_input):
+
+    app = App()
+    app.run()
+    
+    mocked_print.assert_any_call('You are not logged in')
+
+
+@patch('builtins.input', side_effect=['6', '0'])
+@patch('builtins.print')
+def test_logout_no_session(mocked_print, mocked_input):
+
+    app = App()
+    app._App__auth.token = MagicMock()
+    app._App__auth.session = None
+    
+    app.run()
+    
+    mocked_print.assert_any_call('No active session')
+
+
+@patch('gpm_ssd.managers.auth_handler.getpass')
+@patch('requests.Session')
+@patch('builtins.input', side_effect=['1', 'user'])
+@patch('builtins.print')
+def test_login_token_validation_error(mocked_print, mocked_input, mocked_session_class, mocked_pass):
+
+    mocked_pass.return_value = 'password'
+    mock_session = MagicMock()
+    mocked_session_class.return_value = mock_session
+    
+    mock_session.post.return_value.status_code = 200
+    mock_session.post.return_value.json.return_value = {
+        'access': 'invalid_token',
+        'refresh': 'invalid_token'
+    }
+    
+    app = App()
+    app.run()
+    
+    assert app._App__auth.token is None
+
+
+@patch('gpm_ssd.managers.auth_handler.getpass')
+@patch('requests.Session')
+@patch('builtins.input', side_effect=['1', 'user'])
+@patch('builtins.print')
+def test_login_exception(mocked_print, mocked_input, mocked_session_class, mocked_pass):
+
+    mocked_pass.return_value = 'password'
+    mock_session = MagicMock()
+    mocked_session_class.return_value = mock_session
+    
+    mock_session.post.side_effect = Exception("Network error")
+    
+    app = App()
+    app.run()
+    
+    mocked_print.assert_any_call('Login error: Network error')
+
+
+@patch('builtins.input', side_effect=['1', 'user', '0'])
+@patch('builtins.print')
+def test_login_already_logged_in(mocked_print, mocked_input):
+
+    app = App()
+    app._App__auth.token = MagicMock()
+    
+    app.run()
+    
+    mocked_input.assert_called()
